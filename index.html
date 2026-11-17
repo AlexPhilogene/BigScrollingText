@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Scroller">
+<meta name="theme-color" content="#000000">
+<title>Big Scrolling Text</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Inter:wght@400;600;900&family=Pacifico&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#000; --fg:#ffd400; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; background:#0b0b0d; color:#eee;
+    font-family:Inter, -apple-system, system-ui, sans-serif; overscroll-behavior:none; }
+  body { -webkit-user-select:none; user-select:none; }
+
+  /* ---------- Settings ---------- */
+  #setup { min-height:100%; padding:
+      calc(env(safe-area-inset-top) + 18px) calc(env(safe-area-inset-right) + 18px)
+      calc(env(safe-area-inset-bottom) + 18px) calc(env(safe-area-inset-left) + 18px);
+    max-width:720px; margin:0 auto; }
+  h1 { font-size:22px; font-weight:900; margin:4px 0 14px; letter-spacing:-.02em; }
+  h1 span { color:var(--fg); }
+  textarea { width:100%; min-height:84px; font:600 20px Inter, sans-serif; color:#fff;
+    background:#18181c; border:1px solid #2c2c33; border-radius:14px; padding:12px 14px;
+    resize:vertical; -webkit-user-select:text; user-select:text; }
+  textarea:focus { outline:2px solid var(--fg); border-color:transparent; }
+  .row { display:flex; align-items:center; gap:12px; margin:14px 0; }
+  .row label { width:78px; flex:none; font-size:14px; color:#9a9aa5; font-weight:600; }
+  .row input[type=range] { flex:1; accent-color:var(--fg); height:28px; }
+  .row output { width:44px; text-align:right; font-variant-numeric:tabular-nums; font-size:14px; color:#ccc; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; flex:1; }
+  .chip { border:1px solid #2c2c33; background:#18181c; color:#ddd; border-radius:999px;
+    padding:8px 12px; font:600 14px Inter, sans-serif; cursor:pointer; }
+  .chip.on { background:var(--fg); color:#000; border-color:var(--fg); }
+  .swatch { width:34px; height:34px; border-radius:50%; border:2px solid #2c2c33; cursor:pointer; padding:0; }
+  .swatch.on { border-color:#fff; box-shadow:0 0 0 2px #0b0b0d inset; }
+  input[type=color] { width:34px; height:34px; border:none; background:none; padding:0; border-radius:50%; }
+  #preview { margin:16px 0; height:64px; border-radius:12px; overflow:hidden; position:relative;
+    background:var(--bg); display:flex; align-items:center; }
+  #preview span { white-space:nowrap; font-size:44px; color:var(--fg); padding-left:12px; }
+  #go { width:100%; font:900 20px Inter, sans-serif; padding:16px; border-radius:16px; border:none;
+    background:var(--fg); color:#000; cursor:pointer; margin-top:6px; }
+  .tip { font-size:13px; color:#7d7d88; line-height:1.5; margin-top:14px; }
+  .tip b { color:#bbb; }
+
+  /* ---------- Stage ---------- */
+  #stage { position:fixed; inset:0; background:var(--bg); display:none; overflow:hidden; z-index:10; touch-action:none; }
+  #stage.show { display:block; }
+  #rot { position:absolute; left:0; top:0; transform-origin:0 0; overflow:hidden; }
+  #track { position:absolute; top:50%; left:0; white-space:nowrap; will-change:transform;
+    color:var(--fg); line-height:1; }
+  #track.glow { text-shadow:0 0 .06em currentColor, 0 0 .2em currentColor; }
+  #dots { position:absolute; inset:0; pointer-events:none; display:none;
+    background-image:radial-gradient(transparent 55%, var(--bg) 62%);
+    background-size:7px 7px; }
+  #dots.on { display:block; }
+  #hud { position:absolute; left:50%; bottom:calc(env(safe-area-inset-bottom) + 14px);
+    transform:translateX(-50%); display:flex; gap:10px; opacity:0; pointer-events:none; transition:opacity .25s; z-index:2; }
+  #hud.show { opacity:1; pointer-events:auto; }
+  #hud button { font:700 15px Inter, sans-serif; color:#fff; background:rgba(40,40,46,.85);
+    border:1px solid rgba(255,255,255,.15); border-radius:999px; padding:10px 16px;
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div id="setup">
+  <h1>Big <span>Scrolling</span> Text</h1>
+  <textarea id="txt" maxlength="500" placeholder="Type your message…">HELLO! 👋</textarea>
+
+  <div id="preview"><span id="pv">HELLO! 👋</span></div>
+
+  <div class="row"><label>Speed</label><input id="speed" type="range" min="1" max="20" value="8"><output id="speedO">8</output></div>
+  <div class="row"><label>Size</label><input id="size" type="range" min="30" max="100" value="80"><output id="sizeO">80%</output></div>
+
+  <div class="row"><label>Font</label><div class="chips" id="fonts"></div></div>
+  <div class="row"><label>Text</label><div class="chips" id="fgs"></div></div>
+  <div class="row"><label>Background</label><div class="chips" id="bgs"></div></div>
+  <div class="row"><label>Direction</label><div class="chips" id="dirs"></div></div>
+  <div class="row"><label>Effects</label><div class="chips" id="fx"></div></div>
+
+  <button id="go">▶ Start</button>
+
+  <p class="tip">
+    <b>Turn your iPhone sideways</b> — the text always runs along the long edge, even if rotation lock is on.<br>
+    <b>Tap</b> the screen to pause and show controls. <b>Double-tap</b> to exit.<br>
+    For true full-screen with no Safari bars: Share → <b>Add to Home Screen</b>, then open it from there.
+  </p>
+</div>
+
+<div id="stage">
+  <div id="rot">
+    <div id="track"></div>
+    <div id="dots"></div>
+  </div>
+  <div id="hud">
+    <button id="bPause">⏸ Pause</button>
+    <button id="bSlow">−</button>
+    <button id="bFast">+</button>
+    <button id="bExit">✕ Exit</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('scroller.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('scroller.' + k, JSON.stringify(v)); } catch {} }
+  };
+
+  const FONTS = [
+    ['Bold', "'Inter', sans-serif", 900],
+    ['Anton', "'Anton', sans-serif", 400],
+    ['Bebas', "'Bebas Neue', sans-serif", 400],
+    ['LED', "'VT323', monospace", 400],
+    ['Script', "'Pacifico', cursive", 400],
+  ];
+  const FG = ['#ffd400','#ffffff','#ff3b30','#34c759','#0a84ff','#ff2d95','#00f0ff','#000000'];
+  const BG = ['#000000','#ffffff','#ffd400','#ff3b30','#0a84ff','#1c1c1e'];
+
+  const s = Object.assign({
+    text:'HELLO! 👋', speed:8, size:80, font:0, fg:'#ffd400', bg:'#000000', dir:'left', glow:false, dots:false, flash:false
+  }, store.get('settings', {}));
+
+  const save = () => store.set('settings', s);
+  const applyColors = () => {
+    document.documentElement.style.setProperty('--fg', s.fg);
+    document.documentElement.style.setProperty('--bg', s.bg);
+  };
+
+  // ---------- Settings UI ----------
+  $('txt').value = s.text;
+  $('speed').value = s.speed; $('speedO').textContent = s.speed;
+  $('size').value = s.size; $('sizeO').textContent = s.size + '%';
+
+  function chips(el, items, isOn, onPick, render) {
+    el.innerHTML = '';
+    items.forEach((it, i) => {
+      const b = document.createElement('button');
+      render(b, it, i);
+      b.onclick = () => { onPick(it, i); save(); refresh(); };
+      b._on = () => b.classList.toggle('on', isOn(it, i));
+      el.appendChild(b);
+    });
+  }
+  const swatch = (b, c) => { b.className = 'swatch'; b.style.background = c; b.setAttribute('aria-label', c); };
+  const chip = (b, t) => { b.className = 'chip'; b.textContent = t; };
+
+  chips($('fonts'), FONTS, (f,i) => s.font === i, (f,i) => s.font = i,
+        (b,f) => { chip(b, f[0]); b.style.fontFamily = f[1]; b.style.fontWeight = f[2]; });
+  chips($('fgs'), FG, c => s.fg === c, c => s.fg = c, swatch);
+  chips($('bgs'), BG, c => s.bg === c, c => s.bg = c, swatch);
+  chips($('dirs'), [['left','← Left'],['right','Right →'],['still','Still']], d => s.dir === d[0], d => s.dir = d[0], (b,d) => chip(b, d[1]));
+  chips($('fx'), [['glow','✨ Glow'],['dots','▦ LED dots'],['flash','⚡ Flash']], e => s[e[0]], e => s[e[0]] = !s[e[0]], (b,e) => chip(b, e[1]));
+
+  function refresh() {
+    document.querySelectorAll('.chips button').forEach(b => b._on && b._on());
+    applyColors();
+    const f = FONTS[s.font];
+    const pv = $('pv');
+    pv.textContent = s.text || ' ';
+    pv.style.fontFamily = f[1]; pv.style.fontWeight = f[2];
+  }
+  $('txt').addEventListener('input', e => { s.text = e.target.value; save(); refresh(); });
+  $('speed').addEventListener('input', e => { s.speed = +e.target.value; $('speedO').textContent = s.speed; save(); });
+  $('size').addEventListener('input', e => { s.size = +e.target.value; $('sizeO').textContent = s.size + '%'; save(); });
+  refresh();
+
+  // ---------- Stage ----------
+  const stage = $('stage'), rot = $('rot'), track = $('track'), hud = $('hud');
+  let W = 0, H = 0, x = 0, textW = 0, raf = 0, last = 0, paused = false, running = false, hudTimer = 0, t0 = 0;
+  let wakeLock = null;
+
+  function layout() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const portrait = vh > vw;
+    // Always lay text along the long edge.
+    W = Math.max(vw, vh); H = Math.min(vw, vh);
+    rot.style.width = W + 'px'; rot.style.height = H + 'px';
+    rot.style.transform = portrait ? `translateX(${vw}px) rotate(90deg)` : 'none';
+    const f = FONTS[s.font];
+    track.style.fontFamily = f[1];
+    track.style.fontWeight = f[2];
+    // Script/Bebas fonts have different vertical metrics; scale by height.
+    track.style.fontSize = (H * s.size / 100) + 'px';
+    track.style.transform = 'translate(0,-50%)';
+    textW = track.getBoundingClientRect()[portrait ? 'height' : 'width'] || track.scrollWidth;
+    textW = track.scrollWidth;
+    if (s.dir === 'still') x = (W - textW) / 2;
+  }
+
+  function frame(t) {
+    raf = requestAnimationFrame(frame);
+    const dt = Math.min(50, t - (last || t)); last = t;
+    if (!paused && s.dir !== 'still') {
+      const pxPerMs = (s.speed * 0.045) * (H / 390);   // scale with screen size
+      x += (s.dir === 'left' ? -1 : 1) * pxPerMs * dt;
+      if (s.dir === 'left' && x < -textW) x = W;
+      if (s.dir === 'right' && x > W) x = -textW;
+    }
+    track.style.transform = `translate3d(${x}px,-50%,0)`;
+    if (s.flash) track.style.opacity = (Math.floor((t - t0) / 350) % 2) ? 0.15 : 1;
+    else track.style.opacity = 1;
+  }
+
+  async function requestWake() {
+    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch {}
+  }
+
+  function start() {
+    s.text = $('txt').value.trim() || ' ';
+    track.textContent = s.text.replace(/\n+/g, '   ');
+    track.classList.toggle('glow', s.glow);
+    $('dots').classList.toggle('on', s.dots);
+    applyColors();
+    document.body.style.background = s.bg;
+    $('setup').style.display = 'none';
+    stage.classList.add('show');
+    paused = false; $('bPause').textContent = '⏸ Pause';
+    hud.classList.remove('show');
+    const go = () => {
+      layout();
+      x = s.dir === 'right' ? -textW : s.dir === 'left' ? W : (W - textW) / 2;
+      last = 0; t0 = performance.now();
+      cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
+    };
+    (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(go);
+    running = true;
+    requestWake();
+    // Try real fullscreen where supported (not on iPhone Safari, but harmless).
+    try { const el = document.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el)?.catch?.(()=>{}); } catch {}
+  }
+
+  function stop() {
+    running = false;
+    cancelAnimationFrame(raf);
+    stage.classList.remove('show');
+    $('setup').style.display = '';
+    document.body.style.background = '';
+    try { wakeLock && wakeLock.release(); } catch {} wakeLock = null;
+    try { document.fullscreenElement && document.exitFullscreen(); } catch {}
+  }
+
+  function showHud() {
+    hud.classList.add('show');
+    clearTimeout(hudTimer);
+    hudTimer = setTimeout(() => { if (!paused) hud.classList.remove('show'); }, 2500);
+  }
+
+  // Tap = pause/show controls, double-tap = exit
+  let lastTap = 0, tapTimer = 0;
+  stage.addEventListener('pointerup', e => {
+    if (e.target.closest('#hud')) return;
+    const now = Date.now();
+    if (now - lastTap < 300) { clearTimeout(tapTimer); lastTap = 0; stop(); return; }
+    lastTap = now;
+    tapTimer = setTimeout(() => {
+      paused = !paused;
+      $('bPause').textContent = paused ? '▶ Play' : '⏸ Pause';
+      showHud();
+    }, 300);
+  });
+
+  $('bPause').onclick = () => { paused = !paused; $('bPause').textContent = paused ? '▶ Play' : '⏸ Pause'; showHud(); };
+  $('bSlow').onclick = () => { s.speed = Math.max(1, s.speed - 1); $('speed').value = s.speed; $('speedO').textContent = s.speed; save(); showHud(); };
+  $('bFast').onclick = () => { s.speed = Math.min(20, s.speed + 1); $('speed').value = s.speed; $('speedO').textContent = s.speed; save(); showHud(); };
+  $('bExit').onclick = stop;
+  $('go').onclick = start;
+
+  window.addEventListener('resize', () => { if (running) layout(); });
+  window.addEventListener('orientationchange', () => setTimeout(() => running && layout(), 250));
+  document.addEventListener('visibilitychange', () => { if (running && document.visibilityState === 'visible') requestWake(); });
+})();
+</script>
+</body>
+</html>
